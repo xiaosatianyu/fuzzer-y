@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+#coding=utf-8
 import os
 import sys
 import angr
@@ -32,7 +32,7 @@ strcnt = itertools.count()
 def create(binary):
 
     b = angr.Project(binary, load_options={'auto_load_libs': False})
-    cfg = b.analyses.CFG(resolve_indirect_jumps=True, collect_data_references=True)
+    cfg = b.analyses.CFG(resolve_indirect_jumps=True, collect_data_references=True) #读取目标程序的流程图
 
     state = b.factory.blank_state()
 
