@@ -229,7 +229,7 @@ class Fuzzer(object):
 
         return stats
 
-    def found_crash(self): #返回是否发现crash
+    def found_crash(self): #返回是否发现crash,这是由谁发现的crash
 
         return len(self.crashes()) > 0
 
