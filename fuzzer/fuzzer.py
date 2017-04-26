@@ -1,14 +1,14 @@
 #coding=utf-8
+import angr
+import logging
 import os
+import shellphish_afl
+import shutil
+import signal
+import subprocess
 import sys
 import time
-import angr
-import signal
-import shutil
-import subprocess
-import shellphish_afl
 
-import logging
 
 l = logging.getLogger("fuzzer.fuzzer")
 
@@ -39,7 +39,7 @@ class Fuzzer(object):
 
         self.binary_path    = binary_path
         self.work_dir       = work_dir
-        self.afl_count      = afl_count
+        self.afl_count      = afl_count  #afl的数量
         self.time_limit     = time_limit #默认没有设置fuzz结束时间
         self.library_path   = library_path # 库路径, 什么用?
         self.target_opts    = [ ] if target_opts is None else target_opts
@@ -491,7 +491,8 @@ class Fuzzer(object):
         args += self.binary_path if self.is_multicb else [self.binary_path]
         
         ##add by yyy-------------------------------------
-        args+=["@@", "/tmp/shelfish"]
+        #args+=["@@", "/tmp/shelfish"]
+        args+=["@@"]
         ##end-----------------------------------------------------
         
         args.extend(self.target_opts)
