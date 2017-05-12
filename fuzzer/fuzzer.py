@@ -20,9 +20,12 @@ class InstallError(Exception):
 class Fuzzer(object):
     ''' Fuzzer object, spins up a fuzzing job on a binary '''
 
+#     def __init__(self, binary_path, work_dir, afl_count=1, library_path=None, time_limit=None,
+#             target_opts=None, extra_opts=None, create_dictionary=False,
+#             seeds=None, crash_mode=False, never_resume=False, qemu=True):
     def __init__(self, binary_path, work_dir, afl_count=1, library_path=None, time_limit=None,
             target_opts=None, extra_opts=None, create_dictionary=False,
-            seeds=None, crash_mode=False, never_resume=False, qemu=True):
+            seeds=None, crash_mode=False, never_resume=False, qemu=True,fast_mode=False):
         '''
         :param binary_path: path to the binary to fuzz. List or tuple for multi-CB.
         :param work_dir: the work directory which contains fuzzing jobs, our job directory will go here
@@ -35,6 +38,7 @@ class Fuzzer(object):
         :param crash_mode: if set to True AFL is set to crash explorer mode, and seed will be expected to be a crashing input
         :param never_resume: never resume an old fuzzing run, even if it's possible
         :param qemu: Utilize QEMU for instrumentation of binary.
+        :param fast_mode: utilize the afl-fast as the fuzzing engine
         '''
 
         self.binary_path    = binary_path
@@ -124,6 +128,10 @@ class Fuzzer(object):
 
             # the path to AFL capable of calling driller
             self.afl_path         = shellphish_afl.afl_bin(self.os)# 读取aflfuzz执行程序
+            # change to afl-fast
+            if fast_mode:
+                self.afl_path="/home/xiaosatianyu/workspace/git/aflfast/afl-fuzz"
+                
             #选择对应平台的qemu执行程序
             if self.os == 'cgc':
                 self.afl_path_var = shellphish_afl.afl_path_var('cgc')
