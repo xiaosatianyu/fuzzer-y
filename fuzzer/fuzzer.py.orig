@@ -1,15 +1,18 @@
 #coding=utf-8
+import angr
+import logging
 import os
+import shellphish_afl
+import shutil
+<<<<<<< HEAD
+import signal
+=======
+import threading
+>>>>>>> 14f3b436bcfe1eb8e5843d1812839cc8deffc302
+import subprocess
 import sys
 import time
-import angr
-import signal
-import shutil
-import threading
-import subprocess
-import shellphish_afl
 
-import logging
 
 l = logging.getLogger("fuzzer.fuzzer")
 
@@ -61,12 +64,21 @@ class InfiniteTimer():
 class Fuzzer(object):
     ''' Fuzzer object, spins up a fuzzing job on a binary '''
 
+<<<<<<< HEAD
+#     def __init__(self, binary_path, work_dir, afl_count=1, library_path=None, time_limit=None,
+#             target_opts=None, extra_opts=None, create_dictionary=False,
+#             seeds=None, crash_mode=False, never_resume=False, qemu=True):
+    def __init__(self, binary_path, work_dir, afl_count=1, library_path=None, time_limit=None,
+            target_opts=None, extra_opts=None, create_dictionary=False,
+            seeds=None, crash_mode=False, never_resume=False, qemu=True,fast_mode=False):
+=======
     def __init__(
         self, binary_path, work_dir, afl_count=1, library_path=None, time_limit=None, memory="8G",
         target_opts=None, extra_opts=None, create_dictionary=False,
         seeds=None, crash_mode=False, never_resume=False, qemu=True, stuck_callback=None,
-        force_interval=None, job_dir=None,fast_mode=False
+        force_interval=None, job_dir=None
     ):
+>>>>>>> 14f3b436bcfe1eb8e5843d1812839cc8deffc302
         '''
         :param binary_path: path to the binary to fuzz. List or tuple for multi-CB.
         :param work_dir: the work directory which contains fuzzing jobs, our job directory will go here
@@ -79,10 +91,13 @@ class Fuzzer(object):
         :param crash_mode: if set to True AFL is set to crash explorer mode, and seed will be expected to be a crashing input
         :param never_resume: never resume an old fuzzing run, even if it's possible
         :param qemu: Utilize QEMU for instrumentation of binary.
+<<<<<<< HEAD
+        :param fast_mode: utilize the afl-fast as the fuzzing engine
+=======
         :param memory: AFL child process memory limit (default: "8G")
         :param stuck_callback: the callback to call when afl has no pending fav's
         :param job_dir: a job directory to override the work_dir/binary_name path
-		:param fast_mode: utilize the afl-fast as the fuzzing engine
+>>>>>>> 14f3b436bcfe1eb8e5843d1812839cc8deffc302
         '''
 
         self.binary_path    = binary_path
@@ -113,13 +128,21 @@ class Fuzzer(object):
                 raise ValueError("Seeds must be specified if using the fuzzer in crash mode")
             l.info("AFL will be started in crash mode")
 
+<<<<<<< HEAD
         #self.seeds          = ["fuzz"] if seeds is None or len(seeds) == 0 else seeds
         ##modified by yyy
         self.seeds          = ['/home/xiaosatianyu/Desktop/driller/seed'] if seeds is None or len(seeds) == 0 else seeds
         
-        self.job_dir  = os.path.join(self.work_dir, self.binary_id) if not job_dir else job_dir
+        self.job_dir  = os.path.join(self.work_dir, self.binary_id) #设定目标程序的工作目录
         self.in_dir   = os.path.join(self.job_dir, "input") #afl的输入目录
         self.out_dir  = os.path.join(self.job_dir, "sync") #afl的输出目录
+=======
+        self.seeds          = ["fuzz"] if seeds is None or len(seeds) == 0 else seeds
+
+        self.job_dir  = os.path.join(self.work_dir, self.binary_id) if not job_dir else job_dir
+        self.in_dir   = os.path.join(self.job_dir, "input")
+        self.out_dir  = os.path.join(self.job_dir, "sync")
+>>>>>>> 14f3b436bcfe1eb8e5843d1812839cc8deffc302
 
         # sanity check extra opts
         self.extra_opts = extra_opts
@@ -186,9 +209,13 @@ class Fuzzer(object):
                 # set up libraries
                 self._export_library_path(p)
 
+<<<<<<< HEAD
+        self.qemu_dir         = self.afl_path_var # qemu的执行程序路径
+=======
         self.qemu_name = p.arch.qemu_name
         self.qemu_dir = self.afl_path_var
 
+>>>>>>> 14f3b436bcfe1eb8e5843d1812839cc8deffc302
         l.debug("self.start_time: %r", self.start_time)
         l.debug("self.afl_path: %s", self.afl_path)
         l.debug("self.afl_path_var: %s", self.afl_path_var)
@@ -223,8 +250,12 @@ class Fuzzer(object):
             # limit it's memory
             if create_dictionary:
                 if self._create_dict(dictionary_file):
+<<<<<<< HEAD
                     self.dictionary = dictionary_file  #执行Fuzzer模块下的字典创建脚本
+=======
+                    self.dictionary = dictionary_file
                     l.warning("done making dictionary")
+>>>>>>> 14f3b436bcfe1eb8e5843d1812839cc8deffc302
                 else:
                     # no luck creating a dictionary
                     l.warning("[%s] unable to create dictionary", self.binary_id)
@@ -527,7 +558,11 @@ class Fuzzer(object):
 
     ### AFL SPAWNERS AFL生成器
 
+<<<<<<< HEAD
+    def _start_afl_instance(self, memory="8G"): #内存
+=======
     def _start_afl_instance(self):
+>>>>>>> 14f3b436bcfe1eb8e5843d1812839cc8deffc302
 
         args = [self.afl_path] #aflfuzz的路径
 
