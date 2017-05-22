@@ -500,7 +500,8 @@ class Fuzzer(object):
         
         ##add by yyy-------------------------------------
         #args+=["@@", "/tmp/shelfish"]
-        args+=["@@"]
+        #args+=["@@"]
+        args+=["-a","@@"]
         ##end-----------------------------------------------------
         
         args.extend(self.target_opts)
