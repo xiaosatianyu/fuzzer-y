@@ -13,7 +13,7 @@ import logging
 
 l = logging.getLogger("fuzzer.fuzzer")
 
-config = { } #这个是干嘛的
+config = { } 
 
 class InstallError(Exception):
     pass
@@ -65,7 +65,7 @@ class Fuzzer(object):
         self, binary_path, work_dir, afl_count=1, library_path=None, time_limit=None, memory="8G",
         target_opts=None, extra_opts=None, create_dictionary=False,
         seeds=None, crash_mode=False, never_resume=False, qemu=True, stuck_callback=None,
-        force_interval=None, job_dir=None,fast_mode=False
+        force_interval=None, job_dir=None,fast_mode=False,input_from='stdin',afl_input_para=None
     ):
         '''
         :param binary_path: path to the binary to fuzz. List or tuple for multi-CB.
@@ -83,18 +83,22 @@ class Fuzzer(object):
         :param stuck_callback: the callback to call when afl has no pending fav's
         :param job_dir: a job directory to override the work_dir/binary_name path
 		:param fast_mode: utilize the afl-fast as the fuzzing engine
+		:param input_from: indicate where is the input come from, stdin or file
+		:param afl_input_para: the parameter for afl to start the program
         '''
 
         self.binary_path    = binary_path
         self.work_dir       = work_dir
         self.afl_count      = afl_count  #afl的数量
-        self.time_limit     = time_limit #默认没有设置fuzz结束时间
+        self.time_limit     = time_limit #默认没有设置fuzz结束时间 按秒计算
         self.library_path   = library_path # 库路径, 什么用?
         self.target_opts    = [ ] if target_opts is None else target_opts
         self.crash_mode     = crash_mode
         self.memory         = memory
         self.qemu           = qemu
         self.force_interval = force_interval
+        self.input_from     = input_from
+        self.afl_input_para=afl_input_para 
 
         Fuzzer._perform_env_checks() #系统环境配置
 
@@ -113,10 +117,7 @@ class Fuzzer(object):
                 raise ValueError("Seeds must be specified if using the fuzzer in crash mode")
             l.info("AFL will be started in crash mode")
 
-        #self.seeds          = ["fuzz"] if seeds is None or len(seeds) == 0 else seeds
-        ##modified by yyy
-        self.seeds          = ['/home/xiaosatianyu/Desktop/driller/seed'] if seeds is None or len(seeds) == 0 else seeds
-        
+        self.seeds          = ["fuzz"] if seeds is None or len(seeds) == 0 else seeds
         self.job_dir  = os.path.join(self.work_dir, self.binary_id) if not job_dir else job_dir
         self.in_dir   = os.path.join(self.job_dir, "input") #afl的输入目录
         self.out_dir  = os.path.join(self.job_dir, "sync") #afl的输出目录
@@ -136,13 +137,13 @@ class Fuzzer(object):
         # afl dictionary
         self.dictionary       = None
         # processes spun up
-        self.procs            = [ ]  #添加启动的子进程对象
+        self.procs            = [ ]  #所有的afl对象
         # start the fuzzer ids at 0
         self.fuzz_id          = 0
         
         ##add by yyy---------------------------------------remove the afl cache for debug
-        if os.path.isdir(self.work_dir):
-            shutil.rmtree(self.work_dir) #删除工作目录, 此时尚未生成相关的目录,所以先删除一下没事
+        if os.path.isdir(self.job_dir):
+            shutil.rmtree(self.job_dir) #删除工作目录, 此时尚未生成相关的目录,所以先删除一下没事
         ##end------------------------------------------
                 
         # test if we're resuming an old run  #判断标准是是否存在afl的输出文件
@@ -494,25 +495,6 @@ class Fuzzer(object):
                 f.write(seed)
     ##end--------------------------------------------------------
 
-    ##add by yyy-------------------------------------------
-#     def _initialize_seeds(self):  # self.seeds指定的时测试用的目录
-#         '''
-#         populate the input directory with the seeds specified
-#         '''
-# 
-#         assert len(self.seeds) > 0
-# 
-#         l.debug("initializing seeds %r", self.seeds)
-#         
-#         for seed in os.listdir(self.seeds):  # 遍历多个目标程序, 这里是程序名称
-#            # 复制seed到input目录
-#             shutil.copy(os.path.join(self.seeds, seed) , self.in_dir)
-#            
-           
-    #end ---------------------------------------------
-                
-
-
     ### DICTIONARY CREATION
     def _create_dict(self, dict_file):
 
@@ -565,9 +547,12 @@ class Fuzzer(object):
         args += self.binary_path if self.is_multicb else [self.binary_path]
         
         ##add by yyy-------------------------------------
-        #args+=["@@", "/tmp/shelfish"]
-        #args+=["@@"]
-        args+=["-a","@@"]
+        if self.input_from=='stdin':
+            pass
+        elif self.input_from=='file':
+            args+=self.afl_input_para
+        else:
+            l.error("the parameter to start the AFL is error")  
         ##end-----------------------------------------------------
         
         args.extend(self.target_opts)
