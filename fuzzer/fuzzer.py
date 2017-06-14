@@ -8,6 +8,7 @@ import shutil
 import threading
 import subprocess
 import shellphish_afl
+import copy 
 
 import logging
 
@@ -65,7 +66,8 @@ class Fuzzer(object):
         self, binary_path, work_dir, afl_count=1, library_path=None, time_limit=None, memory="8G",
         target_opts=None, extra_opts=None, create_dictionary=False,
         seeds=None, crash_mode=False, never_resume=False, qemu=True, stuck_callback=None,
-        force_interval=None, job_dir=None,fast_mode=False,input_from='stdin',afl_input_para=None
+        force_interval=None, job_dir=None,
+        fast_mode=False,input_from='stdin',afl_input_para=None,comapre_afl=False
     ):
         '''
         :param binary_path: path to the binary to fuzz. List or tuple for multi-CB.
@@ -85,6 +87,7 @@ class Fuzzer(object):
 		:param fast_mode: utilize the afl-fast as the fuzzing engine
 		:param input_from: indicate where is the input come from, stdin or file
 		:param afl_input_para: the parameter for afl to start the program
+		:param comapre_afl: start a afl not supported by driller, for compare, default is False in _start_afl_instance
         '''
 
         self.binary_path    = binary_path
@@ -98,7 +101,8 @@ class Fuzzer(object):
         self.qemu           = qemu
         self.force_interval = force_interval
         self.input_from     = input_from
-        self.afl_input_para=afl_input_para 
+        self.afl_input_para = afl_input_para
+        self.compare_afl    = comapre_afl 
 
         Fuzzer._perform_env_checks() #系统环境配置
 
@@ -120,7 +124,8 @@ class Fuzzer(object):
         self.seeds          = ["fuzz"] if seeds is None or len(seeds) == 0 else seeds
         self.job_dir  = os.path.join(self.work_dir, self.binary_id) if not job_dir else job_dir
         self.in_dir   = os.path.join(self.job_dir, "input") #afl的输入目录
-        self.out_dir  = os.path.join(self.job_dir, "sync") #afl的输出目录
+        self.out_dir  = os.path.join(self.job_dir, "sync") #afl和driller配合输出目录
+        self.sole_out_dir  = os.path.join(self.job_dir, "sole") #对此afl的输出目录,没有和driller对比
 
         # sanity check extra opts
         self.extra_opts = extra_opts
@@ -137,7 +142,7 @@ class Fuzzer(object):
         # afl dictionary
         self.dictionary       = None
         # processes spun up
-        self.procs            = [ ]  #所有的afl对象
+        self.procs            = [ ]  #所有的afl进程对象, 控制进程
         # start the fuzzer ids at 0
         self.fuzz_id          = 0
         
@@ -517,7 +522,9 @@ class Fuzzer(object):
         args = [self.afl_path] #aflfuzz的路径
 
         args += ["-i", self.in_dir]
-        args += ["-o", self.out_dir]
+            
+        args += ["-o", self.out_dir] 
+            
         args += ["-m", self.memory]
 
         if self.qemu:
@@ -560,11 +567,25 @@ class Fuzzer(object):
         l.debug("execing: %s > %s", ' '.join(args), outfile) #执行信息的输出
 
         # increment the fuzzer ID
-        self.fuzz_id += 1
-
-        outfile = os.path.join(self.job_dir, outfile)
-        with open(outfile, "w") as fp:
-            return subprocess.Popen(args, stdout=fp, close_fds=True) #启动一个子程序,用于将输出信息写到指定文件
+        self.fuzz_id += 1 #id会自增
+        
+        if self.compare_afl:
+            args_cpoy=copy.copy(args) #copy the list
+            args_cpoy[4]=self.sole_out_dir # modify the -o parameter
+        
+        
+        # outfile = os.path.join(self.job_dir, outfile)
+        # with open(outfile, "w") as fp:
+        
+        #drop the output
+        with open('/dev/null', 'wb') as devnull:
+            fp = devnull
+            if self.compare_afl:
+                self.procs.append(subprocess.Popen(args_cpoy, stdout=fp, close_fds=True))
+            
+            return subprocess.Popen(args, stdout=fp, close_fds=True) 
+        
+        #启动一个子程序,用于将输出信息写到指定文件
 
     def _start_afl(self):
         '''
