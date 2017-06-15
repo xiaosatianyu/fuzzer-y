@@ -67,7 +67,7 @@ class Fuzzer(object):
         target_opts=None, extra_opts=None, create_dictionary=False,
         seeds=None, crash_mode=False, never_resume=False, qemu=True, stuck_callback=None,
         force_interval=None, job_dir=None,
-        fast_mode=False,input_from='stdin',afl_input_para=None,comapre_afl=False
+        afl_engine="default",input_from='stdin',afl_input_para=None,comapre_afl=False
     ):
         '''
         :param binary_path: path to the binary to fuzz. List or tuple for multi-CB.
@@ -84,7 +84,7 @@ class Fuzzer(object):
         :param memory: AFL child process memory limit (default: "8G")
         :param stuck_callback: the callback to call when afl has no pending fav's
         :param job_dir: a job directory to override the work_dir/binary_name path
-		:param fast_mode: utilize the afl-fast as the fuzzing engine
+		:param afl_engine: utilize the afl-fast as the fuzzing engine
 		:param input_from: indicate where is the input come from, stdin or file
 		:param afl_input_para: the parameter for afl to start the program
 		:param comapre_afl: start a afl not supported by driller, for compare, default is False in _start_afl_instance
@@ -182,8 +182,11 @@ class Fuzzer(object):
             # the path to AFL capable of calling driller
             self.afl_path         = shellphish_afl.afl_bin(self.os)# 读取aflfuzz执行程序
             # change to afl-fast
-            if fast_mode:
+            if   afl_engine =="fast":
                 self.afl_path="/home/xiaosatianyu/workspace/git/aflfast/afl-fuzz"
+            elif afl_engine =="yyy":
+                self.afl_path="/home/xiaosatianyu/workspace/git/afl-yyy/afl-fuzz"
+               
                 
             #选择对应平台的qemu执行程序
             if self.os == 'cgc':
