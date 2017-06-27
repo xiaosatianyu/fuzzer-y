@@ -577,7 +577,6 @@ class Fuzzer(object):
             args_cpoy=copy.copy(args) #copy the list
             args_cpoy[4]=self.sole_out_dir # modify the -o parameter
         
-        
         # outfile = os.path.join(self.job_dir, outfile)
         # with open(outfile, "w") as fp:
         
@@ -585,7 +584,7 @@ class Fuzzer(object):
         with open('/dev/null', 'wb') as devnull:
             fp = devnull
             if self.compare_afl:
-                self.procs.append(subprocess.Popen(args_cpoy, stdout=fp, close_fds=True))
+                self.procs.append(subprocess.Popen(args_cpoy, stdout=fp, close_fds=True))#添加,有助于关闭
             
             return subprocess.Popen(args, stdout=fp, close_fds=True) 
         
