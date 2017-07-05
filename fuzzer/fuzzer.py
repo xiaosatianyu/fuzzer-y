@@ -67,7 +67,7 @@ class Fuzzer(object):
         target_opts=None, extra_opts=None, create_dictionary=False,
         seeds=None, crash_mode=False, never_resume=False, qemu=True, stuck_callback=None,
         force_interval=None, job_dir=None,
-        afl_engine="default",input_from='stdin',afl_input_para=None,comapre_afl=False
+        afl_engine="default",input_from='stdin',afl_input_para=None,comapre_afl=False,inputs_sorted=False
     ):
         '''
         :param binary_path: path to the binary to fuzz. List or tuple for multi-CB.
@@ -88,6 +88,7 @@ class Fuzzer(object):
 		:param input_from: indicate where is the input come from, stdin or file
 		:param afl_input_para: the parameter for afl to start the program
 		:param comapre_afl: start a afl not supported by driller, for compare, default is False in _start_afl_instance
+		:param inputs_sorted: sort the inputs by some cirterial
         '''
 
         self.binary_path    = binary_path
@@ -100,9 +101,11 @@ class Fuzzer(object):
         self.memory         = memory
         self.qemu           = qemu
         self.force_interval = force_interval
+        #add yyy
         self.input_from     = input_from
         self.afl_input_para = afl_input_para
         self.compare_afl    = comapre_afl 
+        self.inputs_sorted  = inputs_sorted
 
         Fuzzer._perform_env_checks() #系统环境配置
 
@@ -293,9 +296,8 @@ class Fuzzer(object):
 
         self._on = False
 
-    @property
+    @property ##只读属性, 变成一个变量
     def stats(self):  #读取fuzzer_stats文件
-
         # collect stats into dictionary
         stats = {}
         if os.path.isdir(self.out_dir):
@@ -312,6 +314,27 @@ class Fuzzer(object):
                             stats[fuzzer_dir][key.strip()] = val.strip()
 
         return stats
+    
+#     @property ##只读属性, 变成一个变量
+    def get_inputs_by_distance(self,fuzzer_dir):  
+        '''
+        读取distance_record文件
+        '''
+        inputs = []
+        if os.path.isdir(self.out_dir):
+                distance_record_path = os.path.join(self.out_dir, fuzzer_dir, "distance_record") 
+                if os.path.isfile(distance_record_path):
+                    with open(distance_record_path, "rb") as f:
+                        distance_blob = f.read()
+                        distance_lines = distance_blob.split("\n")[:-1]
+                        for distance_power in distance_lines:
+                            inputs_line = distance_power.split(";")
+                            if inputs_line[0].strip() not in inputs:
+                                inputs.append(inputs_line[0].strip())
+                            if inputs_line[1].strip() not in inputs:    
+                                inputs.append(inputs_line[1].strip())
+
+        return inputs
 
     def found_crash(self): #返回是否发现crash,这是由谁发现的crash
 
@@ -704,3 +727,4 @@ class Fuzzer(object):
 
     def __del__(self):
         self.kill()
+
