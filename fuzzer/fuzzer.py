@@ -318,7 +318,7 @@ class Fuzzer(object):
 #     @property ##只读属性, 变成一个变量
     def get_inputs_by_distance(self,fuzzer_dir):  
         '''
-        读取distance_record文件
+        读取distance_record文件,文件中只有部分测试用例,不完全,剩下不好的没有记录,只得到文件名称,去除空格
         '''
         inputs = []
         if os.path.isdir(self.out_dir):
@@ -329,10 +329,14 @@ class Fuzzer(object):
                         distance_lines = distance_blob.split("\n")[:-1]
                         for distance_power in distance_lines:
                             inputs_line = distance_power.split(";")
-                            if inputs_line[0].strip() not in inputs:
+                            inputs_line[0]=os.path.basename(inputs_line[0].strip())
+                            inputs_line[1]=os.path.basename(inputs_line[1].strip())
+                            if inputs_line[0].strip() not in inputs and not inputs_line[0]=="":
                                 inputs.append(inputs_line[0].strip())
-                            if inputs_line[1].strip() not in inputs:    
+                            if inputs_line[1].strip() not in inputs and not inputs_line[1]=="":    
                                 inputs.append(inputs_line[1].strip())
+                else:
+                    self.inputs_sorted=False                
 
         return inputs
 
