@@ -67,7 +67,7 @@ class Fuzzer(object):
         target_opts=None, extra_opts=None, create_dictionary=False,
         seeds=None, crash_mode=False, never_resume=False, qemu=True, stuck_callback=None,
         force_interval=None, job_dir=None,
-        afl_engine="default",input_from='stdin',afl_input_para=None,comapre_afl=False,inputs_sorted=False
+        afl_engine="fast",input_from='stdin',afl_input_para=None,comapre_afl=False,strategy_id='0'
     ):
         '''
         :param binary_path: path to the binary to fuzz. List or tuple for multi-CB.
@@ -88,7 +88,7 @@ class Fuzzer(object):
 		:param input_from: indicate where is the input come from, stdin or file
 		:param afl_input_para: the parameter for afl to start the program
 		:param comapre_afl: start a afl not supported by driller, for compare, default is False in _start_afl_instance
-		:param inputs_sorted: sort the inputs by some cirterial
+		:param strategy_id : the strategy_id for sort
         '''
 
         self.binary_path    = binary_path
@@ -105,7 +105,7 @@ class Fuzzer(object):
         self.input_from     = input_from
         self.afl_input_para = afl_input_para
         self.compare_afl    = comapre_afl 
-        self.inputs_sorted  = inputs_sorted
+        self.strategy_id    =strategy_id
 
         Fuzzer._perform_env_checks() #系统环境配置
 
@@ -315,31 +315,6 @@ class Fuzzer(object):
 
         return stats
     
-#     @property ##只读属性, 变成一个变量
-    def get_inputs_by_distance(self,fuzzer_dir):  
-        '''
-        读取distance_record文件,文件中只有部分测试用例,不完全,剩下不好的没有记录,只得到文件名称,去除空格
-        '''
-        inputs = []
-        if os.path.isdir(self.out_dir):
-                distance_record_path = os.path.join(self.out_dir, fuzzer_dir, "distance_record") 
-                if os.path.isfile(distance_record_path):
-                    with open(distance_record_path, "rb") as f:
-                        distance_blob = f.read()
-                        distance_lines = distance_blob.split("\n")[:-1]
-                        for distance_power in distance_lines:
-                            inputs_line = distance_power.split(";")
-                            inputs_line[0]=os.path.basename(inputs_line[0].strip())
-                            inputs_line[1]=os.path.basename(inputs_line[1].strip())
-                            if inputs_line[0].strip() not in inputs and not inputs_line[0]=="":
-                                inputs.append(inputs_line[0].strip())
-                            if inputs_line[1].strip() not in inputs and not inputs_line[1]=="":    
-                                inputs.append(inputs_line[1].strip())
-                else:
-                    self.inputs_sorted=False                
-
-        return inputs
-
     def found_crash(self): #返回是否发现crash,这是由谁发现的crash
 
         return len(self.crashes()) > 0
@@ -557,6 +532,8 @@ class Fuzzer(object):
         args += ["-o", self.out_dir] 
             
         args += ["-m", self.memory]
+        
+        args += ["-s", self.strategy_id] #配置策略
 
         if self.qemu:
             args += ["-Q"]
@@ -611,6 +588,7 @@ class Fuzzer(object):
         with open('/dev/null', 'wb') as devnull:
             fp = devnull
             if self.compare_afl:
+                #每启动一个driller的,就会启动一个对比的,对比afl的引擎数量是一致的
                 self.procs.append(subprocess.Popen(args_cpoy, stdout=fp, close_fds=True))#添加,有助于关闭
             
             return subprocess.Popen(args, stdout=fp, close_fds=True) 
