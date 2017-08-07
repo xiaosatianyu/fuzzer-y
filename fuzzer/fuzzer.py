@@ -67,7 +67,7 @@ class Fuzzer(object):
         target_opts=None, extra_opts=None, create_dictionary=False,
         seeds=None, crash_mode=False, never_resume=False, qemu=True, stuck_callback=None,
         force_interval=None, job_dir=None,
-        afl_engine="fast",input_from='stdin',afl_input_para=None,comapre_afl=False,strategy_id='0'
+        afl_engine="deault",input_from='stdin',afl_input_para=None,comapre_afl=False,strategy_id='0',
     ):
         '''
         :param binary_path: path to the binary to fuzz. List or tuple for multi-CB.
@@ -106,6 +106,8 @@ class Fuzzer(object):
         self.afl_input_para = afl_input_para
         self.compare_afl    = comapre_afl 
         self.strategy_id    =strategy_id
+        self.afl_engine     = afl_engine
+        self.fzr_start_time     =time.time()  #the start time of the fuzzer
 
         Fuzzer._perform_env_checks() #系统环境配置
 
@@ -185,9 +187,9 @@ class Fuzzer(object):
             # the path to AFL capable of calling driller
             self.afl_path         = shellphish_afl.afl_bin(self.os)# 读取aflfuzz执行程序
             # change to afl-fast
-            if   afl_engine =="fast":
+            if   self.afl_engine =="fast":
                 self.afl_path="/home/xiaosatianyu/workspace/git/aflfast/afl-fuzz"
-            elif afl_engine =="yyy":
+            elif self.afl_engine =="yyy":
                 self.afl_path="/home/xiaosatianyu/workspace/git/afl-yyy/afl-fuzz"
                
                 
@@ -533,7 +535,8 @@ class Fuzzer(object):
             
         args += ["-m", self.memory]
         
-        args += ["-s", self.strategy_id] #配置策略
+        if "fast" in self.afl_engine:
+            args += ["-s", self.strategy_id] #配置策略
 
         if self.qemu:
             args += ["-Q"]
