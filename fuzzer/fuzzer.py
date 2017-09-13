@@ -9,12 +9,13 @@ import threading
 import subprocess
 import shellphish_afl
 import copy 
+import driller.config as config
 
 import logging
 
 l = logging.getLogger("fuzzer.fuzzer")
 
-config = { } 
+# config = { } 
 
 class InstallError(Exception):
     pass
@@ -67,7 +68,7 @@ class Fuzzer(object):
         target_opts=None, extra_opts=None, create_dictionary=False,
         seeds=None, crash_mode=False, never_resume=False, qemu=True, stuck_callback=None,
         force_interval=None, job_dir=None,
-        afl_engine="deault",input_from='stdin',afl_input_para=None,comapre_afl=False,strategy_id='0',
+        afl_engine=None,input_from='stdin',afl_input_para=None,comapre_afl=False,strategy_id='0', multi_afl=False
     ):
         '''
         :param binary_path: path to the binary to fuzz. List or tuple for multi-CB.
@@ -84,11 +85,13 @@ class Fuzzer(object):
         :param memory: AFL child process memory limit (default: "8G")
         :param stuck_callback: the callback to call when afl has no pending fav's
         :param job_dir: a job directory to override the work_dir/binary_name path
-		:param afl_engine: utilize the afl-fast as the fuzzing engine
+        
+		:param afl_engine: select the fuzzing engine
 		:param input_from: indicate where is the input come from, stdin or file
 		:param afl_input_para: the parameter for afl to start the program
 		:param comapre_afl: start a afl not supported by driller, for compare, default is False in _start_afl_instance
 		:param strategy_id : the strategy_id for sort
+		:param multi_afl: shelfish_afl, afl_fast, afl run together
         '''
 
         self.binary_path    = binary_path
@@ -107,7 +110,8 @@ class Fuzzer(object):
         self.compare_afl    = comapre_afl 
         self.strategy_id    =strategy_id
         self.afl_engine     = afl_engine
-        self.fzr_start_time     =time.time()  #the start time of the fuzzer
+        self.fzr_start_time =time.time()  #the start time of the fuzzer
+        self.multi_afl      =multi_afl
 
         Fuzzer._perform_env_checks() #系统环境配置
 
@@ -128,6 +132,15 @@ class Fuzzer(object):
 
         self.seeds          = ["fuzz"] if seeds is None or len(seeds) == 0 else seeds
         self.job_dir  = os.path.join(self.work_dir, self.binary_id) if not job_dir else job_dir
+        if not self.multi_afl:
+            if self.afl_engine==config.AFL_FAST:
+                self.job_dir+="-fast"
+            if self.afl_engine==config.AFL:
+                self.job_dir+="-normal"
+            if self.afl_engine==config.AFL_YYY:
+                self.job_dir+="-yyy"
+            if self.afl_engine is None:
+                self.job_dir+="-shelfish"
         self.in_dir   = os.path.join(self.job_dir, "input") #afl的输入目录
         self.out_dir  = os.path.join(self.job_dir, "sync") #afl和driller配合输出目录
         self.sole_out_dir  = os.path.join(self.job_dir, "sole") #对此afl的输出目录,没有和driller对比
@@ -153,11 +166,18 @@ class Fuzzer(object):
         
         ##add by yyy---------------------------------------remove the afl cache for debug
         if os.path.isdir(self.job_dir):
-            shutil.rmtree(self.job_dir) #删除工作目录, 此时尚未生成相关的目录,所以先删除一下没事
+            for item in os.listdir(  os.path.join(self.job_dir,'sync') ) :
+                if "fuzzer" in item:
+                    shutil.rmtree(os.path.join(self.job_dir,'sync',item)) #删除工作目录,  aflfast的重新跑有问题
         ##end------------------------------------------
                 
         # test if we're resuming an old run  #判断标准是是否存在afl的输出文件
-        self.resuming         = bool(os.listdir(self.out_dir)) if os.path.isdir(self.out_dir) else False
+        #self.resuming         = bool(os.listdir(self.out_dir)) if os.path.isdir(self.out_dir) else False
+        self.resuming  = bool('fuzzer-master' in os.listdir(self.out_dir)) if os.path.isdir(self.out_dir) else False
+        if self.resuming:
+            # 避免第二次跑的时候因为queue中有crash而不跑
+            os.environ['AFL_SKIP_CRASHES'] = "1"
+            
         # has the fuzzer been turned on?
         self._on = False  
 
@@ -186,11 +206,10 @@ class Fuzzer(object):
 
             # the path to AFL capable of calling driller
             self.afl_path         = shellphish_afl.afl_bin(self.os)# 读取aflfuzz执行程序
-            # change to afl-fast
-            if   self.afl_engine =="fast":
-                self.afl_path="/home/xiaosatianyu/workspace/git/aflfast/afl-fuzz"
-            elif self.afl_engine =="yyy":
-                self.afl_path="/home/xiaosatianyu/workspace/git/afl-yyy/afl-fuzz"
+            
+            # change the afl engine
+            if  not self.afl_engine is None:
+                self.afl_path=self.afl_engine
                
                 
             #选择对应平台的qemu执行程序
@@ -256,7 +275,7 @@ class Fuzzer(object):
         self._stuck_callback = stuck_callback
 
         # set environment variable for the AFL_PATH
-        os.environ['AFL_PATH'] = self.afl_path_var  #设定afl对应的qemu到 环境变量中
+        os.environ['AFL_PATH'] = self.afl_path_var  #设定afl对应的qemu到 环境变量中 所有的qemu用的都是同一个
 
     ### EXPOSED 这个函数是外放的, 调用一个内部的函数 启动afl
     def start(self):
@@ -407,10 +426,11 @@ class Fuzzer(object):
                     continue
 
                 attrs = dict(map(lambda x: (x[0], x[-1]), map(lambda y: y.split(":"), crash.split(","))))
-
-                if int(attrs['sig']) not in signals:
+                try:
+                    if int(attrs['sig']) not in signals:
+                        continue
+                except Exception as e:
                     continue
-
                 crash_path = os.path.join(crashes_dir, crash)
                 with open(crash_path, 'rb') as f:
                     crashes.add(f.read())
@@ -525,78 +545,143 @@ class Fuzzer(object):
 
     ### AFL SPAWNERS AFL生成器
 
+#     def _start_afl_instance(self):
+# 
+#         args = [self.afl_path] #aflfuzz的路径
+# 
+#         args += ["-i", self.in_dir]
+#             
+#         args += ["-o", self.out_dir] 
+#         
+#         if not self.afl_engine is None  and "fast" in self.afl_engine:
+#             args += ["-s", self.strategy_id] #配置策略
+# 
+#         if self.qemu:
+#             args += ["-m", self.memory]
+#             args += ["-Q"]
+#             
+#         if self.crash_mode:
+#             args += ["-C"]
+# 
+#         if self.fuzz_id == 0:
+#             args += ["-M", "fuzzer-master"]
+#             outfile = "fuzzer-master.log"
+#         else:
+#             args += ["-S", "fuzzer-%d" % self.fuzz_id]  #启动多个afl
+#             outfile = "fuzzer-%d.log" % self.fuzz_id
+# 
+#         if self.dictionary is not None:
+#             args += ["-x", self.dictionary]
+# 
+#         if self.extra_opts is not None:
+#             args += self.extra_opts
+# 
+#         # auto-calculate timeout based on the number of binaries
+#         if self.is_multicb:
+#             args += ["-t", "%d+" % (1000 * len(self.binary_path))] #如果是cgc 就要加这个
+# 
+#         args += ["--"]
+#         args += self.binary_path if self.is_multicb else [self.binary_path]
+#         
+#         ##add by yyy-------------------------------------
+#         if self.input_from=='stdin':
+#             pass
+#         elif self.input_from=='file':
+#             args+=self.afl_input_para
+#         else:
+#             l.error("the parameter to start the AFL is error")  
+#         ##end-----------------------------------------------------
+#         
+#         args.extend(self.target_opts)
+# 
+#         l.debug("execing: %s > %s", ' '.join(args), outfile) #执行信息的输出
+# 
+#         # increment the fuzzer ID
+#         self.fuzz_id += 1 #id会自增
+#         
+#         if self.compare_afl:
+#             args_cpoy=copy.copy(args) #copy the list
+#             args_cpoy[4]=self.sole_out_dir # modify the -o parameter
+#         
+#         time.sleep(1)
+#         print args
+#         #drop the output
+#         with open('/dev/null', 'wb') as devnull:
+#             fp = devnull
+#             if self.compare_afl:
+#                 #每启动一个driller的,就会启动一个对比的,对比afl的引擎数量是一致的
+#                 self.procs.append(subprocess.Popen(args_cpoy, stdout=fp, close_fds=True))#添加,有助于关闭
+#             
+#             return subprocess.Popen(args, stdout=fp, close_fds=True) 
+
     def _start_afl_instance(self):
-
-        args = [self.afl_path] #aflfuzz的路径
-
-        args += ["-i", self.in_dir]
-            
-        args += ["-o", self.out_dir] 
-            
-        args += ["-m", self.memory]
-        
-        if "fast" in self.afl_engine:
-            args += ["-s", self.strategy_id] #配置策略
-
-        if self.qemu:
-            args += ["-Q"]
-
-        if self.crash_mode:
-            args += ["-C"]
-
-        if self.fuzz_id == 0:
-            args += ["-M", "fuzzer-master"]
-            outfile = "fuzzer-master.log"
+        afl_path_list=list()
+        if self.multi_afl :
+            afl_path_list.append(config.AFL_FAST)
+            #afl_path_list.append(config.AFL_YYY)
+            afl_path_list.append(config.AFL_Shellfish_unix)
+            afl_path_list.append(config.AFL)
         else:
-            args += ["-S", "fuzzer-%d" % self.fuzz_id]  #启动多个afl
-            outfile = "fuzzer-%d.log" % self.fuzz_id
-
-        if self.dictionary is not None:
-            args += ["-x", self.dictionary]
-
-        if self.extra_opts is not None:
-            args += self.extra_opts
-
-        # auto-calculate timeout based on the number of binaries
-        if self.is_multicb:
-            args += ["-t", "%d+" % (1000 * len(self.binary_path))] #如果是cgc 就要加这个
-
-        args += ["--"]
-        args += self.binary_path if self.is_multicb else [self.binary_path]
+            afl_path_list.append(self.afl_path)
         
-        ##add by yyy-------------------------------------
-        if self.input_from=='stdin':
-            pass
-        elif self.input_from=='file':
-            args+=self.afl_input_para
-        else:
-            l.error("the parameter to start the AFL is error")  
-        ##end-----------------------------------------------------
-        
-        args.extend(self.target_opts)
-
-        l.debug("execing: %s > %s", ' '.join(args), outfile) #执行信息的输出
-
-        # increment the fuzzer ID
-        self.fuzz_id += 1 #id会自增
-        
-        if self.compare_afl:
-            args_cpoy=copy.copy(args) #copy the list
-            args_cpoy[4]=self.sole_out_dir # modify the -o parameter
-        
-        # outfile = os.path.join(self.job_dir, outfile)
-        # with open(outfile, "w") as fp:
-        
-        #drop the output
-        with open('/dev/null', 'wb') as devnull:
-            fp = devnull
+        for choose_afl in    afl_path_list: 
+            #开启一个选定的afl引擎
+            args = [choose_afl]  # aflfuzz的路径
+            args += ["-i", self.in_dir]
+            args += ["-o", self.out_dir] 
+            
+            if not choose_afl is None  and "fast" in choose_afl:
+                args += ["-s", self.strategy_id]  # 配置策略
+                
+            if self.qemu:
+                args += ["-m", self.memory]
+                args += ["-Q"]
+            if self.crash_mode:
+                args += ["-C"]
+            if self.fuzz_id == 0:
+                args += ["-M", "fuzzer-master"]
+                outfile = "fuzzer-master.log"
+            else:
+                args += ["-S", "fuzzer-%d" % self.fuzz_id]  # 启动多个afl
+                outfile = "fuzzer-%d.log" % self.fuzz_id
+            if self.dictionary is not None:
+                args += ["-x", self.dictionary]
+            if self.extra_opts is not None:
+                args += self.extra_opts
+                # auto-calculate timeout based on the number of binaries
+            if self.is_multicb:
+                args += ["-t", "%d+" % (1000 * len(self.binary_path))]  # 如果是cgc 就要加这个
+            args += ["--"]
+            args += self.binary_path if self.is_multicb else [self.binary_path]
+                
+            ##add by yyy-------------------------------------
+            if self.input_from == 'stdin':
+                pass
+            elif self.input_from == 'file':
+                args += self.afl_input_para
+            else:
+                l.error("the parameter to start the AFL is error")  
+            ##end-----------------------------------------------------
+                
+            args.extend(self.target_opts)
+            l.debug("execing: %s > %s", ' '.join(args), outfile)  # 执行信息的输出
+            # increment the fuzzer ID
+            self.fuzz_id += 1  # id会自增
             if self.compare_afl:
-                #每启动一个driller的,就会启动一个对比的,对比afl的引擎数量是一致的
-                self.procs.append(subprocess.Popen(args_cpoy, stdout=fp, close_fds=True))#添加,有助于关闭
-            
-            return subprocess.Popen(args, stdout=fp, close_fds=True) 
+                args_cpoy = copy.copy(args)  # copy the list
+                args_cpoy[4] = self.sole_out_dir  # modify the -o parameter
+            time.sleep(1)
+            print args
+            # drop the output
+            with open('/tmp/afl', 'wb') as devnull:
+                fp = devnull
+                if self.compare_afl:
+                    # 每启动一个driller的,就会启动一个对比的,对比afl的引擎数量是一致的
+                    self.procs.append(subprocess.Popen(args_cpoy, stdout=fp, close_fds=True))  # 添加,有助于关闭
+                self.procs.append(subprocess.Popen(args, stdout=fp, close_fds=True))    
+                
+                #return subprocess.Popen(args, stdout=fp, close_fds=True)         
         
-        #启动一个子程序,用于将输出信息写到指定文件
 
     def _start_afl(self):
         '''
@@ -604,17 +689,21 @@ class Fuzzer(object):
         '''
 
         # spin up the master AFL instance
-        master = self._start_afl_instance() # the master fuzzer 启动了一个masterafl master是一个 Popen 对象
-        self.procs.append(master)
+        #master = self._start_afl_instance() # the master fuzzer 启动了一个masterafl master是一个 Popen 对象
+        #self.procs.append(master)
+        self._start_afl_instance()
 
         if self.afl_count > 1: #判断是否启动多个afl
-            driller = self._start_afl_instance()
-            self.procs.append(driller)
-
+            #driller = self._start_afl_instance()
+            #self.procs.append(driller)
+            self._start_afl_instance()
+            
+            
         # only spins up an AFL instances if afl_count > 1
         for _ in range(2, self.afl_count):
-            slave = self._start_afl_instance()
-            self.procs.append(slave)
+            #slave = self._start_afl_instance()
+            #self.procs.append(slave)
+            self._start_afl_instance()
 
     ### UTIL
 
