@@ -165,7 +165,7 @@ class Fuzzer(object):
         self.fuzz_id          = 0
         
         ##add by yyy---------------------------------------remove the afl cache for debug
-        if os.path.isdir(self.job_dir):
+        if os.path.isdir( os.path.join(self.job_dir,"sync")):
             for item in os.listdir(  os.path.join(self.job_dir,'sync') ) :
                 if "fuzzer" in item:
                     shutil.rmtree(os.path.join(self.job_dir,'sync',item)) #删除工作目录,  aflfast的重新跑有问题
