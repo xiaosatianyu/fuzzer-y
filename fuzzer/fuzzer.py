@@ -276,7 +276,7 @@ class Fuzzer(object):
 
         # set environment variable for the AFL_PATH
         os.environ['AFL_PATH'] = self.afl_path_var  #设定afl对应的qemu到 环境变量中 所有的qemu用的都是同一个
-
+        os.environ['AFL_SKIP_CRASHES'] = '1' #避免 queue下的crash导致afl不能运行
     ### EXPOSED 这个函数是外放的, 调用一个内部的函数 启动afl
     def start(self):
         '''
