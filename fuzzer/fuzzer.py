@@ -267,7 +267,7 @@ class Fuzzer(object):
 
         if self.force_interval is None:
             l.warning("not forced")
-            self._timer = InfiniteTimer(30, self._timer_callback)
+            self._timer = InfiniteTimer(30, self._timer_callback) #这个是用来计时的吗 啥用?
         else:
             l.warning("forced")
             self._timer = InfiniteTimer(self.force_interval, self._timer_callback)
